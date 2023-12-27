@@ -11,16 +11,16 @@ class CustomGradleDistributionPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val config = project.extensions.create("gradleDist", CustomGradleDistConfig::class.java)
         project.afterEvaluate {
-            validateAndEnrich(config)
+            validateAndEnrich(config, it)
             project.tasks.register("buildGradleDist", BuildCustomGradleDistributionTask::class.java) {
                 it.config.set(config)
             }
         }
     }
 
-    private fun validateAndEnrich(config: CustomGradleDistConfig) {
+    private fun validateAndEnrich(config: CustomGradleDistConfig, project: Project) {
         validateGradleVersion(config)
-        validateCustomDistributionVersion(config)
+        configureCustomDistributionVersionIfNecessary(config, project)
         configureCustomDistributionName(config)
         configureDistributionTypeIfNecessary(config)
         configureGradleUrlMapperIfNecessary(config)
@@ -41,17 +41,21 @@ class CustomGradleDistributionPlugin : Plugin<Project> {
         }
     }
 
-    private fun validateCustomDistributionVersion(config: CustomGradleDistConfig) {
-        if (!config.customDistributionVersion.isPresent || config.customDistributionVersion.get().isBlank()) {
+    private fun configureCustomDistributionVersionIfNecessary(config: CustomGradleDistConfig, project: Project) {
+        val notSpecified = !config.customDistributionVersion.isPresent || config.customDistributionVersion.get().isBlank()
+        if (notSpecified && project.version == Project.DEFAULT_VERSION) {
             throw IllegalStateException(
                 """
-                    can not build - custom gradle distribution version is undefined. Please specify it like below:
+                    can not build - custom gradle distribution version is undefined. Please specify it like below or use project.version as default:
     
                     gradleDist {
                         ${CustomGradleDistConfig::customDistributionVersion.name} = "1.0"
                     }
                 """.trimIndent()
             )
+        }
+        if (notSpecified) {
+            config.customDistributionVersion.set(project.version.toString())
         }
     }
 
